@@ -37,7 +37,7 @@
     func UserExists(userId string) (bool, error) {
         _, err := dao.FindUserById(userId)
         if err != nil {
-            if errors.Is(err, RecordNotFoundError) {
+            if errors.Is(err, dao.RecordNotFoundError) {
                 return false, nil
             }
             return false, err
