@@ -5,8 +5,8 @@
 ## 思路
 
 
-1. `sql.ErrNoRows` 只是找不到对应的记录，在dao层不算sql错误
-2. 应该在dao层捕获这个错误，返回nil，其他dao层的错误，wrap后返回
+1. `sql.ErrNoRows` 在dao层不算sql错误，只是找不到对应的记录
+2. 应该在dao层捕获这个错误，返回`自定义异常`，如`record not found`，其他dao层的错误，wrap后返回
 3. service层根据实际情况判断，是否报错或打印日志，或者其他处理，见下方举例
 
 ## 举例
@@ -16,7 +16,7 @@
 
 ## 伪代码
     // error
-    NoRowsError := errors.New("sql.ErrNoRows")
+    RecordNotFoundError := errors.New("record not found")
     
     // model
     type User struct {}
@@ -25,24 +25,24 @@
     func FindUserById(userId string) (*model.User, error) {
         user := &model.User{}
         if err := db.Where(`"id" = ?`, userId).Find(user).Error; err != nil {
-            if err == NoRowsError {
-                return nil, nil
+            if errors.Is(err, sql.ErrNoRows) {
+                return nil, RecordNotFoundError
             }
-            return nil, errors.Warp(err, fmt.Sprintf("dao.FindUserById sql error, userId: %s", userId))
+            return nil, errors.Wrap(err, fmt.Sprintf("dao.FindUserById sql error, userId: %s", userId))
         }
         return user, nil
     }
     
     // service
     func UserExists(userId string) (bool, error) {
-        user, err := dao.FindUserById(userId)
+        _, err := dao.FindUserById(userId)
         if err != nil {
-            return false, error
+            if errors.Is(err, RecordNotFoundError) {
+                return false, nil
+            }
+            return false, err
         }
-        if user != nil {
-            return true, nil
-        }
-        return false, nil
+        return true, nil
     }
     
     // controller
